@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 客服与售后 Agent · 方案总览</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --line:#e3e6eb; --line2:#eef1f4;
+    --ink:#1a1d21; --ink2:#5b6470; --ink3:#8b939e;
+    --blue:#185fa5; --blue-bg:#e6f1fb;
+    --teal:#0f6e56; --teal-bg:#e1f5ee;
+    --amber:#854f0b; --amber-bg:#faeeda;
+    --red:#a32d2d; --red-bg:#fcebeb;
+    --purple:#534ab7; --purple-bg:#eeedfe;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       line-height:1.7;font-size:14px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 28px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:40px}
+  .kicker{font-size:12px;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase;margin-bottom:10px}
+  h1{font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+  h1 span{color:var(--blue)}
+  .sub{color:var(--ink2);margin-top:10px;max-width:760px;font-size:14.5px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{font-size:12px;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--ink2)}
+  .chip.b{background:var(--blue-bg);border-color:#c7dff5;color:var(--blue)}
+  section{margin-bottom:48px}
+  h2{font-size:15px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:3px;height:14px;background:var(--blue);border-radius:2px}
+  .lead{color:var(--ink2);font-size:13.5px;margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px}
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;
+        border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th{background:#fafbfc;text-align:left;font-weight:600;color:var(--ink2);font-size:12px;
+     padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid var(--line2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  code{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;background:#f1f3f5;
+       padding:1px 5px;border-radius:4px;color:#3a4149}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;font-weight:500}
+  .t-a{background:var(--teal-bg);color:var(--teal)}
+  .t-l1{background:var(--amber-bg);color:var(--amber)}
+  .t-l2{background:var(--purple-bg);color:var(--purple)}
+  .t-r{background:var(--red-bg);color:var(--red)}
+  .t-n{background:#f1f3f5;color:var(--ink2)}
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{display:grid;grid-template-columns:52px 1fr;gap:16px;position:relative;padding-bottom:16px}
+  .step:last-child{padding-bottom:0}
+  .step .n{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid var(--line);
+           display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink3);
+           font-weight:600;z-index:1}
+  .step.key .n{background:var(--blue);border-color:var(--blue);color:#fff}
+  .step .body{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+  .step .body b{font-size:13.5px;font-weight:600}
+  .step .body p{font-size:12.5px;color:var(--ink2);margin-top:3px}
+  .step:not(:last-child)::before{content:"";position:absolute;left:17px;top:34px;bottom:0;width:1px;background:var(--line)}
+  .sms{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sm{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px}
+  .sm h3{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--ink2)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:4px 9px;border-radius:6px;
+        background:#f7f8fa;border:1px solid var(--line);color:var(--ink2);margin:0 6px 6px 0;
+        font-family:"Cascadia Mono",Consolas,monospace}
+  .pill.on{background:var(--blue-bg);border-color:#c7dff5;color:var(--blue)}
+  .pill.ok{background:var(--teal-bg);border-color:#bfe6d8;color:var(--teal)}
+  .pill.bad{background:var(--red-bg);border-color:#f3cdcd;color:var(--red)}
+  .arrow{color:var(--ink3);font-size:11px}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line2);font-size:13px}
+  .kv:last-child{border-bottom:none}
+  .kv span:first-child{color:var(--ink2)}
+  .kv span:last-child{font-weight:500}
+  .note{background:#fbfcfd;border:1px solid var(--line);border-left:3px solid var(--blue);
+        border-radius:8px;padding:14px 16px;font-size:13px;color:var(--ink2)}
+  .note b{color:var(--ink)}
+  footer{border-top:1px solid var(--line);padding-top:20px;color:var(--ink3);font-size:12px;
+         display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media(max-width:860px){.g3,.g2,.g4,.sms{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">电商售后 · Agent 方案</div>
+  <h1>AI 客服与售后 Agent<br><span>从一句话到一笔可审计的退款</span></h1>
+  <p class="sub">把「理解问题 → 查订单 → 判规则 → 出方案 → 等确认 → 走审批 → 执行」这条链路做成受控状态机。
+     模型负责理解与表达，代码负责判定与推进。</p>
+  <div class="chips">
+    <span class="chip b">工具调用 10 个</span>
+    <span class="chip">业务规则 15 条</span>
+    <span class="chip">会话 12 态 / 退款 12 态</span>
+    <span class="chip">人工审批 L1 / L2</span>
+    <span class="chip">20 张表 · 21 个接口</span>
+    <span class="chip">原型 6 场景 / 13 断言全绿</span>
+  </div>
+</header>
+
+<section>
+  <h2>主链路编排</h2>
+  <p class="lead">蓝色节点是必须经过的不可跳过环节。方案与确认之间没有捷径，这是审计底线。</p>
+  <div class="card flow">
+    <div class="step">
+      <div class="n">01</div>
+      <div class="body"><b>意图识别 + 槽位抽取</b>
+        <p>五类意图（订单 / 物流 / 退款 / FAQ / 其他），单轮最多追问一个槽位，上下文可继承订单号。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">02</div>
+      <div class="body"><b>上下文装载 + 身份校验</b>
+        <p>订单快照、物流快照、会员等级、风控标签、适用规则版本；手机尾号不符不披露任何订单信息。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">03</div>
+      <div class="body"><b>工具调用</b>
+        <p><code>get_order</code> <code>get_logistics</code> <code>check_refund_eligibility</code>
+           <code>create_refund_draft</code>；单轮上限 4 次，失败返回结构化错误而非异常。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">04</div>
+      <div class="body"><b>规则引擎判定</b>
+        <p>15 条硬规则短路执行：状态 → 重复 → 类目 → 时效 → 金额 → 运费 → 审批分档，输出决策码。</p></div>
+    </div>
+    <div class="step key">
+      <div class="n">05</div>
+      <div class="body"><b>方案卡 + 确认闸门</b>
+        <p>展示金额拆解、退回方式、到账时效；签发一次性 <code>confirm_token</code>（10 分钟）。
+           此时库里只有 DRAFT，没有任何资金动作。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">06</div>
+      <div class="body"><b>执行分流</b>
+        <p>≤500 自动通过；500–2000 主管审批；&gt;2000 财务审批；风控命中直接人工。</p></div>
+    </div>
+    <div class="step">
+      <div class="n">07</div>
+      <div class="body"><b>回写状态 + 通知 + 审计</b>
+        <p>状态事件、消息、工具调用、审批记录全部带 <code>trace_id</code>，任意一笔退款可 30 秒内回放。</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>双状态机</h2>
+  <p class="lead">会话状态管「聊到哪一步」，退款单状态管「这笔钱走到哪一步」。两者解耦：会话 30 分钟过期，退款单可以活好几天。</p>
+  <div class="sms">
+    <div class="sm">
+      <h3>会话状态机（12 态）</h3>
+      <div>
+        <span class="pill">INIT</span><span class="arrow">→</span>
+        <span class="pill">AUTH_VERIFY</span><span class="arrow">→</span>
+        <span class="pill">INTENT_RESOLVED</span><span class="arrow">→</span>
+        <span class="pill">COLLECTING_SLOT</span><span class="arrow">⇄</span>
+        <span class="pill">TOOL_RUNNING</span><span class="arrow">→</span>
+        <span class="pill on">PROPOSAL_PENDING</span><span class="arrow">→</span>
+        <span class="pill on">EXECUTING</span><span class="arrow">→</span>
+        <span class="pill on">PENDING_APPROVAL</span><span class="arrow">→</span>
+        <span class="pill ok">COMPLETED</span>
+      </div>
+      <div style="margin-top:10px">
+        <span class="pill bad">ESCALATED</span>
+        <span class="pill bad">ABORTED</span>
+        <span class="pill bad">EXPIRED</span>
+      </div>
+    </div>
+    <div class="sm">
+      <h3>退款单状态机（12 态）</h3>
+      <div>
+        <span class="pill">DRAFT</span><span class="arrow">→</span>
+        <span class="pill">ELIGIBLE</span><span class="arrow">→</span>
+        <span class="pill">USER_CONFIRMED</span><span class="arrow">→</span>
+        <span class="pill on">PENDING_APPROVAL</span><span class="arrow">→</span>
+        <span class="pill">APPROVED</span><span class="arrow">→</span>
+        <span class="pill">PROCESSING</span><span class="arrow">→</span>
+        <span class="pill ok">SUCCESS</span>
+      </div>
+      <div style="margin-top:10px">
+        <span class="pill bad">REJECTED_BY_RULE</span>
+        <span class="pill bad">REJECTED_BY_HUMAN</span>
+        <span class="pill bad">CANCELLED / EXPIRED / FAILED</span>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:14px">
+    <b>状态管理的三道保险：</b>①转移表强校验，表里没有的 <code>(state, event)</code> 组合直接拒绝；
+    ②<code>version</code> 乐观锁防并发覆盖；③每次跃迁写 <code>agent_state_events</code>，可回放、可归因。
+  </div>
+</section>
+
+<section>
+  <h2>业务规则（15 条，可配置 + 代码兜底）</h2>
+  <p class="lead">规则在代码里，不在提示词里。运营可在 <code>refund_policies</code> 调整阈值，但判定永远由引擎做。</p>
+  <table>
+    <thead><tr><th style="width:78px">编号</th><th>规则</th><th style="width:150px">命中结果</th></tr></thead>
+    <tbody>
+      <tr><td>BR-01/02</td><td>订单非 PAID / SHIPPED / DELIVERED / COMPLETED 不可退</td><td><span class="tag t-r">REJECT_STATUS</span></td></tr>
+      <tr><td>BR-03</td><td>已付款未发货 → 取消订单，全额含运费</td><td><span class="tag t-a">自动通过</span></td></tr>
+      <tr><td>BR-04</td><td>已发货未签收 → 退货退款，需拦截或拒收</td><td><span class="tag t-n">按金额分档</span></td></tr>
+      <tr><td>BR-05/06</td><td>签收 ≤ 7 天可无理由；超期且非质量 → 拒绝</td><td><span class="tag t-r">REJECT_EXPIRED</span></td></tr>
+      <tr><td>BR-07</td><td>超期但主张质量问题 → 需凭证，转人工核实</td><td><span class="tag t-l1">NEED_EVIDENCE</span></td></tr>
+      <tr><td>BR-08</td><td>虚拟 / 定制 / 生鲜 / 贴身衣物 / 已拆封个护 禁退</td><td><span class="tag t-r">REJECT_CATEGORY</span></td></tr>
+      <tr><td>BR-09</td><td>同订单退款 ≥ 2 次 → 强制人工复核</td><td><span class="tag t-l1">升 L1</span></td></tr>
+      <tr><td>BR-10</td><td>已有进行中 / 已完成退款 → 幂等拦截并展示进度</td><td><span class="tag t-r">REJECT_DUPLICATE</span></td></tr>
+      <tr><td>BR-11</td><td>30 天退款率 &gt; 60% 或风控 HIGH</td><td><span class="tag t-l2">NEED_HUMAN_RISK</span></td></tr>
+      <tr><td>BR-12</td><td>≤500 自动 / ≤2000 主管 / &gt;2000 财务</td><td><span class="tag t-n">approval_level</span></td></tr>
+      <tr><td>BR-13</td><td>无理由且未包邮扣回运费；质量问题平台承担</td><td><span class="tag t-n">金额拆解</span></td></tr>
+      <tr><td>BR-14</td><td>部分退款按明细行实付占比，含优惠分摊</td><td><span class="tag t-n">行级金额</span></td></tr>
+      <tr><td>BR-15</td><td>退款总额不得超过实付减已退</td><td><span class="tag t-n">截断 + 告警</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>数据模型（20 张表）</h2>
+  <p class="lead">业务域与 Agent 域同库不同表，退款落单与规则判定可在同一事务完成。</p>
+  <div class="grid g4">
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">业务主数据</div>
+      <div style="font-size:13px;line-height:2">
+        <code>users</code><br><code>categories</code><br><code>orders</code><br><code>order_items</code>
+      </div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">物流与售后</div>
+      <div style="font-size:13px;line-height:2">
+        <code>shipments</code><br><code>shipment_traces</code><br><code>refund_policies</code><br>
+        <code>refund_requests</code><br><code>refund_items</code>
+      </div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">审批与 Agent</div>
+      <div style="font-size:13px;line-height:2">
+        <code>approval_tasks</code><br><code>agent_sessions</code><br><code>agent_messages</code><br>
+        <code>agent_tool_calls</code><br><code>agent_state_events</code>
+      </div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">基础设施</div>
+      <div style="font-size:13px;line-height:2">
+        <code>service_tickets</code><br><code>knowledge_articles</code><br>
+        <code>idempotency_keys</code><br><code>outbox_events</code><br><code>audit_logs</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>接口分层</h2>
+  <p class="lead">对外接口不暴露决策细节，内部工具接口不面向终端，写操作必带幂等键。</p>
+  <table>
+    <thead><tr><th style="width:60px">层</th><th style="width:300px">接口</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td>对外</td><td><code>POST /api/v1/agent/chat</code></td><td>SSE 流式对话，事件：ack / state / tool_call / token / card / done</td></tr>
+      <tr><td>对外</td><td><code>POST /api/v1/agent/confirm</code></td><td>唯一能把退款单推进到 USER_CONFIRMED 的入口，校验 token</td></tr>
+      <tr><td>对外</td><td><code>POST /api/v1/agent/handoff</code></td><td>转人工，附结构化摘要，坐席无需重问</td></tr>
+      <tr><td>审批</td><td><code>POST /api/v1/approvals/{no}/decision</code></td><td>通过 / 驳回 / 转办 / 补材料，可改额并留痕</td></tr>
+      <tr><td>内部</td><td><code>POST /internal/tools/refund/eligibility</code></td><td>纯计算判定，返回决策码 + 金额 + 规则指纹</td></tr>
+      <tr><td>内部</td><td><code>POST /internal/tools/refund/draft</code></td><td>生成草稿与一次性令牌，不触发资金动作</td></tr>
+      <tr><td>回调</td><td><code>POST /webhooks/payment-refund</code></td><td>清结算结果，驱动 SUCCESS / FAILED</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>三条设计红线</h2>
+  <div class="grid g3">
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">不确认不落单</div>
+      <p style="font-size:12.5px;color:var(--ink2)">方案只写 DRAFT 并签发一次性令牌；模型没有权限直接提交退款。
+        "已提交"这句话只有在 token 校验通过后才说得出口。</p>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">规则在代码里</div>
+      <p style="font-size:12.5px;color:var(--ink2)">金额、时效、类目由引擎算，提示词只负责解释。
+        用户怎么说、模型怎么想，都改不了 BR 的判定结果。</p>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">一切可回放</div>
+      <p style="font-size:12.5px;color:var(--ink2)">每次工具调用、每次状态跃迁、每次审批都落库并带 trace_id。
+        客诉复盘能定位到"第几轮、哪个工具、哪条规则"。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>原型验证结果</h2>
+  <p class="lead">纯标准库 + SQLite，无第三方依赖，一条命令跑完 6 个场景。</p>
+  <div class="grid g2">
+    <div class="card">
+      <div class="kv"><span>物流查询</span><span>TOOL_RUNNING → COMPLETED，1 次工具调用</span></div>
+      <div class="kv"><span>299 元自动退</span><span>方案阶段仅 DRAFT，确认后 SUCCESS</span></div>
+      <div class="kv"><span>1880 元审批退</span><span>生成 L1 任务 → 通过 → SUCCESS</span></div>
+      <div class="kv"><span>签收 12 天</span><span>BR-06 拒绝，未产生退款单</span></div>
+    </div>
+    <div class="card">
+      <div class="kv"><span>生鲜类目</span><span>BR-08 拒绝，未产生退款单</span></div>
+      <div class="kv"><span>令牌过期</span><span>状态转 EXPIRED，退款单置 EXPIRED</span></div>
+      <div class="kv"><span>重复确认</span><span>幂等返回，退款单数仍为 1</span></div>
+      <div class="kv"><span>非法跃迁</span><span>PROPOSAL_PENDING --auto_approved--> 被拒</span></div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:14px">
+    <b>13 条断言全部通过。</b>关键证据：方案阶段 <code>SELECT COUNT(*) FROM refund_requests WHERE status&lt;&gt;'DRAFT'</code> 结果为 0。
+  </div>
+</section>
+
+<section>
+  <h2>交付与节奏</h2>
+  <div class="grid g3">
+    <div class="card"><div style="font-size:12px;color:var(--ink3)">M1 · 第 2-3 周</div>
+      <div style="font-size:13px;font-weight:600;margin:4px 0">MVP 闭环</div>
+      <p style="font-size:12.5px;color:var(--ink2)">5 个场景端到端，确认闸门 + L1 审批可用，mock 执行。</p></div>
+    <div class="card"><div style="font-size:12px;color:var(--ink3)">M2 · 第 4-5 周</div>
+      <div style="font-size:13px;font-weight:600;margin:4px 0">完整能力</div>
+      <p style="font-size:12.5px;color:var(--ink2)">15 条规则 + 风控 + SLA 升级 + 降级 + 看板，60 条用例全绿。</p></div>
+    <div class="card"><div style="font-size:12px;color:var(--ink3)">M3 · 第 6 周</div>
+      <div style="font-size:13px;font-weight:600;margin:4px 0">灰度上线</div>
+      <p style="font-size:12.5px;color:var(--ink2)">影子 → 5% → 20% → 全量；误退率 &gt; 0.3% 自动回滚。</p></div>
+  </div>
+</section>
+
+<footer>
+  <span>AI 客服与售后 Agent · 需求分析 / 库表 / 接口 / 编排 / 原型</span>
+  <span>v1.0 · 2026-11</span>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,671 @@
+openapi: 3.0.3
+info:
+  title: AI 客服与售后 Agent API
+  version: 1.0.0
+  description: |
+    电商平台售后 Agent 的对外接口、审批接口与内部工具接口。
+    这是生产设计契约。可运行项目的本地 JSON 接口列在 docs/06-可运行项目设计与退款授权.md。
+
+    约定：
+    - 统一响应信封 {code, message, data, trace_id, server_time}，code=0 为成功。
+    - 业务上的"不可退"不是错误：HTTP 200，data.eligible=false。
+    - 所有写操作需携带 Idempotency-Key。
+servers:
+  - url: https://api.example-mall.com
+    description: 生产
+  - url: http://localhost:8080
+    description: 生产契约的开发环境
+
+tags:
+  - name: agent
+    description: 对话与会话编排
+  - name: refund
+    description: 退款查询与确认
+  - name: approval
+    description: 人工审批
+  - name: tools
+    description: 内部工具（仅 Agent 服务可调，mTLS）
+  - name: webhook
+    description: 第三方回调
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    mtls:
+      type: mutualTLS
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 64 }
+      description: 幂等键，24 小时内同 key 同 body 返回首次结果。写接口强烈建议传。
+
+  headers:
+    XTraceId:
+      schema: { type: string }
+      description: 全链路追踪 ID
+
+  schemas:
+    Envelope:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: ok }
+        data: {}
+        trace_id: { type: string, example: tr_20261117_8f3a91c2 }
+        server_time: { type: string, format: date-time }
+
+    Error:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            code: { type: integer, example: 4003 }
+            message: { type: string, example: 退款方案已失效，请重新生成 }
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        session_no:
+          type: string
+          description: 为空则新建会话
+          example: S20261117A001
+        user_no: { type: string, example: U1001 }
+        message: { type: string, example: 我上周买的开衫不想要了，订单 ORD20261101001 能退吗 }
+        channel: { type: string, enum: [APP, MINI, WEB, CS], default: APP }
+        client_msg_id: { type: string, description: 端上消息 ID，用于去重 }
+
+    RefundProposal:
+      type: object
+      properties:
+        refund_no: { type: string, example: RF202611170001 }
+        refund_type: { type: string, enum: [CANCEL, REFUND_ONLY, RETURN_REFUND] }
+        refund_type_text: { type: string, example: 退货退款 }
+        amount_detail:
+          type: object
+          properties:
+            goods: { type: number, example: 299.00 }
+            freight_refund: { type: number, example: 0.00 }
+            freight_deduct: { type: number, example: 0.00 }
+            discount_deduct: { type: number, example: 0.00 }
+            total: { type: number, example: 299.00 }
+        return_method: { type: string, example: 上门取件 }
+        eta: { type: string, example: 审核通过后 1-3 个工作日原路退回 }
+        need_user_action:
+          type: array
+          items: { type: string }
+        expire_at: { type: string, format: date-time }
+
+    ElibilityRequest:
+      type: object
+      required: [order_no, reason_code]
+      properties:
+        order_no: { type: string, example: ORD20261101001 }
+        reason_code:
+          type: string
+          enum: [NO_REASON, QUALITY, WRONG_ITEM, DAMAGED, NOT_RECEIVED]
+        refund_type: { type: string, enum: [AUTO, REFUND_ONLY, RETURN_REFUND], default: AUTO }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              order_item_id: { type: integer }
+              qty: { type: integer }
+        evidence_urls:
+          type: array
+          items: { type: string }
+        as_of: { type: string, format: date-time, description: 判定基准时间，默认服务端当前时间 }
+
+    ElibilityResult:
+      type: object
+      properties:
+        eligible: { type: boolean }
+        decision_code:
+          type: string
+          enum:
+            - OK_AUTO
+            - OK_NEED_APPROVAL_L1
+            - OK_NEED_APPROVAL_L2
+            - NEED_EVIDENCE
+            - REJECT_STATUS
+            - REJECT_EXPIRED
+            - REJECT_CATEGORY
+            - REJECT_DUPLICATE
+            - NEED_HUMAN_RISK
+        refund_type: { type: string, enum: [CANCEL, REFUND_ONLY, RETURN_REFUND] }
+        amount:
+          type: object
+          properties:
+            goods: { type: number }
+            freight_refund: { type: number }
+            freight_deduct: { type: number }
+            discount_deduct: { type: number }
+            total: { type: number }
+        need_manual_approval: { type: boolean }
+        approval_level: { type: integer, enum: [0, 1, 2] }
+        requires_evidence: { type: boolean }
+        reasons:
+          type: array
+          items: { type: string }
+        hit_rules:
+          type: array
+          items: { type: string, example: BR-05 }
+        policy_version: { type: integer, example: 3 }
+        fingerprint: { type: string, description: 供 draft 幂等与防篡改 }
+
+    ConfirmRequest:
+      type: object
+      required: [session_no, refund_no, action]
+      properties:
+        session_no: { type: string }
+        refund_no: { type: string }
+        action: { type: string, enum: [CONFIRM, CANCEL] }
+        confirm_token: { type: string, description: CONFIRM 时必填 }
+
+    ConfirmResult:
+      type: object
+      properties:
+        refund_no: { type: string }
+        status:
+          type: string
+          enum: [USER_CONFIRMED, PENDING_APPROVAL, APPROVED, PROCESSING, CANCELLED]
+        next_action: { type: string, enum: [WAIT_APPROVAL, WAIT_RESULT, NONE] }
+        need_manual_approval: { type: boolean }
+        approval_level: { type: integer }
+        sla_deadline: { type: string, format: date-time }
+        user_message: { type: string }
+
+    ApprovalTask:
+      type: object
+      properties:
+        task_no: { type: string }
+        refund_no: { type: string }
+        order_no: { type: string }
+        amount: { type: number }
+        level: { type: integer }
+        decision_code: { type: string }
+        reasons:
+          type: array
+          items: { type: string }
+        sla_remaining_seconds: { type: integer }
+        user_summary: { type: string }
+
+    ApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT, TRANSFER, REQUEST_EVIDENCE] }
+        approved_amount: { type: number }
+        comment: { type: string, description: REJECT 时必填 }
+        transfer_to: { type: string }
+
+paths:
+  /api/v1/agent/chat:
+    post:
+      tags: [agent]
+      summary: 对话（SSE 流式）
+      description: 返回 text/event-stream，事件类型见 03-接口设计 3.1。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200':
+          description: SSE 流
+          content:
+            text/event-stream:
+              schema: { type: string }
+              example: |
+                event: ack
+                data: {"session_no":"S20261117A001","state":"INTENT_RESOLVED"}
+
+                event: card
+                data: {"type":"refund_proposal","payload":{"refund_no":"RF202611170001","amount_detail":{"total":299.00}}}
+
+                event: done
+                data: {"state":"PROPOSAL_PENDING","need_confirm":true}
+        '429':
+          description: 限流
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/agent/confirm:
+    post:
+      tags: [agent]
+      summary: 确认或取消退款方案
+      description: 唯一能把退款单从 DRAFT/ELIGIBLE 推进到 USER_CONFIRMED 的入口。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmRequest' }
+      responses:
+        '200':
+          description: 成功或业务状态拒绝（4001/4003/4004 在 data 中给出原因）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ConfirmResult' }
+        '409':
+          description: 重复提交或方案失效
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/agent/sessions/{session_no}:
+    get:
+      tags: [agent]
+      summary: 会话回看
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: session_no
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 会话状态与最近消息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          session_no: { type: string }
+                          state: { type: string }
+                          human_takeover: { type: boolean }
+                          messages:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                seq: { type: integer }
+                                role: { type: string, enum: [user, assistant, tool, system] }
+                                content: { type: string }
+                                created_at: { type: string, format: date-time }
+
+  /api/v1/agent/handoff:
+    post:
+      tags: [agent]
+      summary: 转人工（附带结构化交接摘要）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_no, reason]
+              properties:
+                session_no: { type: string }
+                reason:
+                  type: string
+                  enum: [USER_REQUEST, RISK, TOOL_FAIL, COMPLAINT, OVER_LIMIT, AGENT_FALLBACK]
+                priority: { type: integer, enum: [1, 2, 3], default: 2 }
+      responses:
+        '200':
+          description: 工单号与排队位次
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ticket_no: { type: string }
+                          queue_position: { type: integer }
+                          summary: { type: string }
+
+  /api/v1/refunds/{refund_no}:
+    get:
+      tags: [refund]
+      summary: 退款进度
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: refund_no
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 退款单详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          refund_no: { type: string }
+                          status: { type: string }
+                          apply_amount: { type: number }
+                          approved_amount: { type: number }
+                          current_node: { type: string, example: 客服主管审批中 }
+                          eta: { type: string }
+                          events:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                at: { type: string, format: date-time }
+                                text: { type: string }
+
+  /api/v1/approvals:
+    get:
+      tags: [approval]
+      summary: 待办审批列表
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, default: PENDING }
+        - name: level
+          in: query
+          schema: { type: integer, enum: [1, 2] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: 列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/ApprovalTask' }
+
+  /api/v1/approvals/{task_no}/decision:
+    post:
+      tags: [approval]
+      summary: 审批决策
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: task_no
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecision' }
+      responses:
+        '200':
+          description: 处理结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task_no: { type: string }
+                          status: { type: string }
+                          refund_status: { type: string }
+        '403':
+          description: 审批越权（6001）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: 任务已被处理（6002）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/traces/{trace_id}:
+    get:
+      tags: [agent]
+      summary: 全链路回放（审计）
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: trace_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 消息、工具调用、状态事件、审批记录
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /internal/tools/orders/{order_no}:
+    get:
+      tags: [tools]
+      summary: T1 订单详情
+      security: [{ mtls: [] }]
+      parameters:
+        - name: order_no
+          in: path
+          required: true
+          schema: { type: string }
+        - name: user_no
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: ok=true 时 data 为订单快照
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /internal/tools/logistics:
+    get:
+      tags: [tools]
+      summary: T3 物流查询（含最近 3 条轨迹）
+      security: [{ mtls: [] }]
+      parameters:
+        - name: order_no
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 物流快照
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /internal/tools/refund/eligibility:
+    post:
+      tags: [tools]
+      summary: T4 退款资格判定（纯计算，不落单）
+      security: [{ mtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ElibilityRequest' }
+      responses:
+        '200':
+          description: 决策结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ElibilityResult' }
+
+  /internal/tools/refund/draft:
+    post:
+      tags: [tools]
+      summary: T5 生成退款方案草稿（不落正式单）
+      security: [{ mtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fingerprint, session_no]
+              properties:
+                fingerprint: { type: string }
+                session_no: { type: string }
+      responses:
+        '200':
+          description: 草稿与确认令牌
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          refund_no: { type: string }
+                          status: { type: string, example: DRAFT }
+                          confirm_token: { type: string }
+                          expire_at: { type: string, format: date-time }
+                          proposal: { $ref: '#/components/schemas/RefundProposal' }
+
+  /internal/tools/refund/confirm:
+    post:
+      tags: [tools]
+      summary: T6 确认退款（唯一推进入口）
+      security: [{ mtls: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refund_no, confirm_token]
+              properties:
+                refund_no: { type: string }
+                confirm_token: { type: string }
+                idempotency_key: { type: string }
+      responses:
+        '200':
+          description: 确认结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /internal/tools/refund/{refund_no}/execute:
+    post:
+      tags: [tools]
+      summary: T7 提交清结算（仅 APPROVED，不暴露给 LLM）
+      security: [{ mtls: [] }]
+      parameters:
+        - name: refund_no
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 已受理
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /webhooks/logistics:
+    post:
+      tags: [webhook]
+      summary: 物流轨迹推送
+      description: 验签后回填 shipments / shipment_traces / orders.delivered_at。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shipment_no: { type: string }
+                tracking_no: { type: string }
+                status: { type: string }
+                traces:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      time: { type: string, format: date-time }
+                      code: { type: string }
+                      desc: { type: string }
+                      location: { type: string }
+      responses:
+        '200':
+          description: 接收成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: integer, example: 0 }
+
+  /webhooks/payment-refund:
+    post:
+      tags: [webhook]
+      summary: 清结算退款结果回调
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refund_no: { type: string }
+                result: { type: string, enum: [SUCCESS, FAILED] }
+                channel_refund_no: { type: string }
+                failed_reason: { type: string }
+      responses:
+        '200':
+          description: 接收成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: integer, example: 0 }

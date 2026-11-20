@@ -1,0 +1,183 @@
+
+==============================================================
+场景 1 · 物流查询（只读工具，不落任何单）
+==============================================================
+
+用户 > 我的快递到哪了？订单 ORD20261101001
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → COMPLETED  (query_done)
+  工具 get_logistics              OK
+客服 > 顺丰速运 SF1388200111，当前状态：已签收
+       · 11-14 16:20 快件已签收，签收人：本人
+       · 11-14 08:40 快件正在派送途中
+       · 11-12 22:10 快件已到达深圳南山集散点
+       已于 11-14 16:20 签收（本人）。
+  [会话态] COMPLETED
+
+==============================================================
+场景 2 · 自动退款（299 元 ≤ 500，需用户确认后才落单）
+==============================================================
+
+用户 > ORD20261101001 这件开衫不想要了，能退吗
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → PROPOSAL_PENDING  (eligible)
+  工具 get_order                  OK
+  工具 check_refund_eligibility   OK
+  工具 create_refund_draft        OK
+客服 > 核对完成，这单可以退。方案如下：
+       · 退款方式：退货退款
+       · 退款金额：¥299.00（商品 ¥299.00）
+       · 退回方式：上门取件（快递员 24 小时内联系）
+       · 到账时效：审核通过后 1-3 个工作日原路退回
+       
+       请核对金额与退回方式，方案有效期为 10 分钟。
+  [方案卡] 退货退款｜商品 ¥299.00 运费退 ¥0.00 运费扣 ¥0.00｜合计 ¥299.00｜自动通过
+  [会话态] PROPOSAL_PENDING
+用户点击确认 → 申请已提交。退货签收或物流拦截核验通过后，将按确认金额发起退款。
+
+==============================================================
+场景 3 · 1880 元需主管审批（L1）
+==============================================================
+
+用户 > ORD20261101003 吸尘器还没收到，我想退款
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → PROPOSAL_PENDING  (eligible)
+  工具 get_order                  OK
+  工具 check_refund_eligibility   OK
+  工具 create_refund_draft        OK
+客服 > 核对完成，这单可以退。方案如下：
+       · 退款方式：退货退款
+       · 退款金额：¥1880.00（商品 ¥1880.00）
+       · 退回方式：上门取件（快递员 24 小时内联系）
+       · 到账时效：审核通过后 1-3 个工作日原路退回
+       · 该笔需客服主管审批，提交后会告诉你预计时间
+       
+       请核对金额与退回方式，方案有效期为 10 分钟。
+  [方案卡] 退货退款｜商品 ¥1880.00 运费退 ¥0.00 运费扣 ¥0.00｜合计 ¥1880.00｜需审批 L1
+  [会话态] PROPOSAL_PENDING
+用户点击确认 → 已提交（单号 RF202611170003），这笔 ¥1880.00 需要客服主管审批，处理时限为 2026-11-17 22:30:00。可在退款进度查看结果。
+
+审批工作台待办：
+  AP202611170003 | ORD20261101003 | ¥1880.00 | L1 | OK_NEED_APPROVAL_L1 | SLA 2026-11-17 22:30:00
+
+审批人 > 通过（leader_01）：核对物流拦截成功，同意退款
+  状态 PENDING_APPROVAL → EXECUTING  (approved)
+  状态 EXECUTING → COMPLETED  (wait_return)
+客服 > 退款申请已审批通过，等待退货签收或物流拦截核验。
+
+==============================================================
+场景 4 · 已签收 12 天（超 7 天无理由期）→ 拒绝并给替代方案
+==============================================================
+
+用户 > ORD20261101002 这双鞋想退一下
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → COMPLETED  (rejected)
+  工具 get_order                  OK
+  工具 check_refund_eligibility   OK
+客服 > 这单暂时不符合退款条件：已签收 12 天，超过 7 天无理由退货期。
+       若为质量问题可提供照片，由人工核实后处理。需要我帮你转人工吗？
+  [会话态] COMPLETED
+
+==============================================================
+场景 5 · 生鲜类目（BR-08 禁退）→ 拒绝
+==============================================================
+
+用户 > ORD20261101004 车厘子退款
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → COMPLETED  (rejected)
+  工具 get_order                  OK
+  工具 check_refund_eligibility   OK
+客服 > 这单暂时不符合退款条件：智利车厘子 2斤装（生鲜食品） 属于不支持无理由退货的类目。
+       可以帮你转接人工进一步协商。需要我帮你转人工吗？
+  [会话态] COMPLETED
+
+==============================================================
+场景 6 · 确认令牌过期 + 转人工
+==============================================================
+
+用户 > ORD20261101005 手机也想退了
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → TOOL_RUNNING  (to_tool)
+  状态 TOOL_RUNNING → PROPOSAL_PENDING  (eligible)
+  工具 get_order                  OK
+  工具 check_refund_eligibility   OK
+  工具 create_refund_draft        OK
+客服 > 核对完成，这单可以退。方案如下：
+       · 退款方式：退货退款
+       · 退款金额：¥3200.00（商品 ¥3200.00）
+       · 退回方式：上门取件（快递员 24 小时内联系）
+       · 到账时效：审核通过后 1-3 个工作日原路退回
+       · 该笔需财务审批，提交后会告诉你预计时间
+       
+       请核对金额与退回方式，方案有效期为 10 分钟。
+  [方案卡] 退货退款｜商品 ¥3200.00 运费退 ¥0.00 运费扣 ¥0.00｜合计 ¥3200.00｜需审批 L2
+  [会话态] PROPOSAL_PENDING
+用户点击确认 → 方案已超过 10 分钟有效期，我重新给你生成一份，回复订单号即可。
+
+用户 > 我要转人工
+  状态 INIT → AUTH_VERIFY  (session_created)
+  状态 AUTH_VERIFY → INTENT_RESOLVED  (auth_ok)
+  状态 INTENT_RESOLVED → ESCALATED  (escalate)
+  工具 handoff_to_human           OK
+客服 > 已经帮你转接人工客服，工单号 TK202611170002，前面还有 2 位。我已经把情况同步给客服，不用重复描述。
+  [会话态] ESCALATED
+
+==============================================================
+场景 7 · 非法跃迁防护（跳过确认直接完成是不可能的）
+==============================================================
+  拦截：非法跃迁: PROPOSAL_PENDING --auto_approved--> ?
+
+==============================================================
+事件溯源：会话 S20261117-03 的完整轨迹
+==============================================================
+  INIT               → AUTH_VERIFY        session_created  by AGENT
+  AUTH_VERIFY        → INTENT_RESOLVED    auth_ok          by AGENT
+  INTENT_RESOLVED    → TOOL_RUNNING       to_tool          by AGENT
+  TOOL_RUNNING       → PROPOSAL_PENDING   eligible         by AGENT
+  PROPOSAL_PENDING   → EXECUTING          user_confirm     by USER
+  EXECUTING          → PENDING_APPROVAL   need_approval    by AGENT
+  PENDING_APPROVAL   → EXECUTING          approved         by HUMAN
+  EXECUTING          → COMPLETED          wait_return      by HUMAN
+
+==============================================================
+断言结果
+==============================================================
+  [PASS] S1 物流查询：工具被调用 1 次，状态 TOOL_RUNNING→COMPLETED
+  [PASS] S2-a 方案阶段：仅 1 条 DRAFT，正式单数量 = 0
+  [PASS] S2-b 确认后自动通过并完成：RF202611170001 / ¥299.00
+  [PASS] S2-c 重复确认：幂等返回，退款单数仍为 1
+  [PASS] S2-d 伪造确认令牌：返回 4003，无法推进退款
+  [PASS] S3-a 生成审批任务 AP202611170003（L1），退款单 PENDING_APPROVAL
+  [PASS] S3-b 审批通过 → 退款单 SUCCESS，会话被唤醒并推送结论
+  [PASS] S3-c 重复审批：返回 6002（任务已处理）
+  [PASS] S4 超期拒绝：BR-06 命中，未产生任何退款单
+  [PASS] S5 类目拒绝：BR-08 命中，未产生退款单
+  [PASS] S6-a 令牌过期：状态转 EXPIRED，退款单置 EXPIRED
+  [PASS] S6-b 转人工：生成工单并附结构化摘要
+  [PASS] S7 非法跃迁：PROPOSAL_PENDING --auto_approved--> 被表校验拒绝
+
+关键数据校验：
+  RF202611170001  SUCCESS            OK_AUTO                ¥299.00
+  RF202611170002  CANCELLED          OK_NEED_APPROVAL_L2    ¥3200.00
+  RF202611170003  SUCCESS            OK_NEED_APPROVAL_L1    ¥1880.00
+  RF202611170004  EXPIRED            OK_NEED_APPROVAL_L2    ¥3200.00
+
+工具调用统计：
+  cancel_refund                1 次
+  check_refund_eligibility     8 次
+  confirm_refund               2 次
+  create_refund_draft          4 次
+  get_logistics                1 次
+  get_order                    6 次
+  handoff_to_human             2 次

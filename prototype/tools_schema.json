@@ -1,0 +1,140 @@
+{
+  "model_hint": "deepseek-chat / gpt-4o 等支持 Function Calling 的模型",
+  "system_rules": [
+    "任何关于订单事实的陈述必须来自工具返回，禁止根据上下文猜测订单状态、金额、物流。",
+    "禁止在用户确认前说『已提交』『已退款』。",
+    "禁止承诺规则外的结果（确保退款/马上到账/一定通过）。",
+    "confirm_refund 只允许在用户明确回复确认后调用，且必须使用 create_refund_draft 返回的 confirm_token。",
+    "工具返回 ok=false 时，先看 error.retryable 决定重试（最多 1 次），否则转人工。",
+    "单轮最多 4 次工具调用。"
+
+  ],
+  "tools": [
+    {
+      "name": "get_order",
+      "description": "按订单号查询订单详情，包括状态、金额明细、商品明细、时间节点。用户提到订单相关问题时必须先调用本工具。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_no": { "type": "string", "description": "订单号，形如 ORD20261101001" }
+        },
+        "required": ["order_no"]
+      }
+    },
+    {
+      "name": "list_user_orders",
+      "description": "查询用户最近订单，用于用户未提供订单号时引导选择。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_no": { "type": "string" },
+          "limit": { "type": "integer", "default": 3 }
+        },
+        "required": ["user_no"]
+      }
+    },
+    {
+      "name": "get_logistics",
+      "description": "查询订单物流状态与最近 3 条轨迹。用户问『到哪了』『发货了吗』时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_no": { "type": "string" }
+        },
+        "required": ["order_no"]
+      }
+    },
+    {
+      "name": "check_refund_eligibility",
+      "description": "判定订单是否满足退款条件。纯计算、不落单。返回 decision_code、金额拆解、是否需要审批。所有退款结论必须来自本工具。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_no": { "type": "string" },
+          "reason_code": {
+            "type": "string",
+            "enum": ["NO_REASON", "QUALITY", "WRONG_ITEM", "DAMAGED", "NOT_RECEIVED"],
+            "description": "退款原因。用户只是『不想要了』用 NO_REASON；提到质量/破损用对应枚举。"
+          }
+        },
+        "required": ["order_no", "reason_code"]
+      }
+    },
+    {
+      "name": "create_refund_draft",
+      "description": "根据判定结果生成退款方案草稿，返回方案卡数据与一次性确认令牌。仅创建 DRAFT，不产生任何资金动作。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fingerprint": { "type": "string", "description": "check_refund_eligibility 返回的指纹，用于幂等与防篡改" }
+        },
+        "required": ["fingerprint"]
+      }
+    },
+    {
+      "name": "confirm_refund",
+      "description": "用户明确确认方案后提交退款。必须携带 create_refund_draft 返回的 confirm_token。未确认不得调用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "refund_no": { "type": "string" },
+          "confirm_token": { "type": "string" }
+        },
+        "required": ["refund_no", "confirm_token"]
+      }
+    },
+    {
+      "name": "get_refund_status",
+      "description": "查询退款单当前节点与预计时效。用户催进度时调用。",
+      "parameters": {
+        "type": "object",
+        "properties": { "refund_no": { "type": "string" } },
+        "required": ["refund_no"]
+      }
+    },
+    {
+      "name": "cancel_refund",
+      "description": "取消尚未确认的退款草稿。",
+      "parameters": {
+        "type": "object",
+        "properties": { "refund_no": { "type": "string" } },
+        "required": ["refund_no"]
+      }
+    },
+    {
+      "name": "handoff_to_human",
+      "description": "转人工。用户主动要求、连续无法解决、命中投诉或风控时调用，必须生成结构化摘要。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": ["USER_REQUEST", "RISK", "TOOL_FAIL", "COMPLAINT", "OVER_LIMIT", "AGENT_FALLBACK"]
+          },
+          "summary": { "type": "string", "description": "用户诉求 + 已查信息 + 已做判断 + 建议动作" }
+        },
+        "required": ["reason", "summary"]
+      }
+    },
+    {
+      "name": "search_faq",
+      "description": "检索售后政策知识库，用于回答规则类问题（几天无理由、多久到账、运费谁承担）。",
+      "parameters": {
+        "type": "object",
+        "properties": { "query": { "type": "string" } },
+        "required": ["query"]
+      }
+    }
+  ],
+  "decision_codes": {
+    "OK_AUTO": "可退，确认后自动执行",
+    "OK_NEED_APPROVAL_L1": "可退，需客服主管审批",
+    "OK_NEED_APPROVAL_L2": "可退，需财务审批",
+    "NEED_EVIDENCE": "需补充质量问题凭证",
+    "REJECT_STATUS": "订单状态不支持退款",
+    "REJECT_EXPIRED": "超出售后期",
+    "REJECT_CATEGORY": "类目不支持无理由退货",
+    "REJECT_DUPLICATE": "已有进行中的退款",
+    "NEED_HUMAN_RISK": "风控命中，必须转人工"
+  }
+}

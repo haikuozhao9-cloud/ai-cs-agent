@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#edf1ed">
+  <title>售后协作台</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="售后协作台首页">
+        <span class="brand-mark" aria-hidden="true">↺</span>
+        <span>售后协作台<small>AFTER-SALES</small></span>
+      </a>
+      <nav aria-label="工作区">
+        <button data-page="customer" class="nav-button"><span aria-hidden="true">◫</span>客户会话</button>
+        <button data-page="staff" class="nav-button"><span aria-hidden="true">▤</span>审批工作台</button>
+        <button data-page="quality" class="nav-button"><span aria-hidden="true">◈</span>质量评测</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="environment-dot"></span> 本地演练环境
+        <small>订单与资金流水使用模拟数据</small>
+      </div>
+    </aside>
+    <div class="desktop">
+      <header class="topbar">
+        <div class="crumb"><span>工作区</span><span aria-hidden="true">/</span><strong id="page-name">客户会话</strong></div>
+        <div class="topbar-actions">
+          <span class="badge" id="mode">连接中</span>
+          <button id="identity" class="identity" type="button"><span class="avatar">客</span><span id="identity-name">切换演示身份</span><span aria-hidden="true">⌄</span></button>
+        </div>
+      </header>
+      <main id="workspace" tabindex="-1"></main>
+    </div>
+  </div>
+  <p class="toast" id="toast" role="status" hidden></p>
+  <dialog id="dialog">
+    <div class="dialog-header"><h2 id="dialog-title"></h2><button type="button" id="close-dialog" class="icon-button" aria-label="关闭弹窗">×</button></div>
+    <div id="dialog-body"></div>
+  </dialog>
+</body>
+</html>
